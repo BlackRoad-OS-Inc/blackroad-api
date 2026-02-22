@@ -1,0 +1,49 @@
+openapi: 3.1.0
+info:
+  title: BlackRoad OS API
+  version: 0.1.0
+  description: REST API for BlackRoad OS
+  contact:
+    email: blackroad.systems@gmail.com
+  license:
+    name: Proprietary
+    url: https://blackroad.ai
+
+servers:
+  - url: https://api.blackroad.ai
+    description: Production
+  - url: http://localhost:3001
+    description: Local development
+
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      security: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /agents:
+    get:
+      summary: List agents
+      responses:
+        '200':
+          description: List of agents
