@@ -1,27 +1,19 @@
-FROM python:3.11-slim
-
+FROM node:20-alpine AS deps
 WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
 
-# Install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy source
-COPY src/ ./src/
+FROM node:20-alpine AS builder  
+WORKDIR /app
 COPY . .
+COPY --from=deps /app/node_modules ./node_modules
+RUN npm run build 2>/dev/null || echo "no build step"
 
-# Create data directories
-RUN mkdir -p /data/tasks/available /data/tasks/claimed \
-             /data/tasks/completed /data/tasks/failed \
-             /data/memory /data/audit
-
-ENV PYTHONPATH=/app
-ENV HOME=/data
-ENV PORT=8000
-
-EXPOSE 8000
-
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8000/health || exit 1
-
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+FROM node:20-alpine
+WORKDIR /app
+ENV NODE_ENV=production PORT=3000
+COPY --from=builder /app ./
+EXPOSE 3000
+HEALTHCHECK --interval=30s --timeout=5s \
+  CMD wget -qO- http://localhost:3000/health || exit 1
+CMD ["node", "dist/index.js"]
