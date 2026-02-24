@@ -9,3 +9,8 @@ dist/
 build/
 .DS_Store
 poetry.lock
+
+# SQLite dev databases
+*.db
+*.db-shm
+*.db-wal
