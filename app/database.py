@@ -84,7 +84,12 @@ def init_db(path: str = "./blackroad.db") -> None:
         db.execute(
             """INSERT OR IGNORE INTO agents
                (id, name, type, color, capabilities, status, created_at)
-               VALUES (?, ?, ?, ?, ?, 'idle', ?)""",
+               VALUES (?, ?, ?, ?, ?, 'active', ?)""",
             [aid, name, atype, color, caps, now],
+        )
+        # Ensure existing agents are active (e.g. after a schema upgrade)
+        db.execute(
+            "UPDATE agents SET status = 'active' WHERE id = ?",
+            [aid],
         )
     db.commit()

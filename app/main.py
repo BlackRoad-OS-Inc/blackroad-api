@@ -1,8 +1,10 @@
 """BlackRoad API — Main FastAPI Application (port 8788)."""
 
+import time
 from time import perf_counter
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from app.api.v1.router import router as v1_router
 from app.core.logging import configure_logging
@@ -33,6 +35,18 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
         allow_credentials=True,
     )
+
+    @application.get("/", include_in_schema=False)
+    async def root():
+        return RedirectResponse(url="/docs")
+
+    @application.get("/health", tags=["health"])
+    async def health_check():
+        return {
+            "status": "ok",
+            "version": application.version,
+            "timestamp": int(time.time()),
+        }
 
     application.include_router(v1_router, prefix="/v1")
     return application
