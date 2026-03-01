@@ -98,7 +98,7 @@ async def list_agents(
         a = dict(r)
         a["capabilities"] = json.loads(a.get("capabilities") or "[]")
         agents.append(a)
-    return {"agents": agents, "count": len(agents)}
+    return {"agents": agents, "total": len(agents)}
 
 
 @router.get("/agents/{agent_id}")
@@ -110,6 +110,30 @@ async def get_agent(agent_id: str) -> dict:
     a = dict(row)
     a["capabilities"] = json.loads(a.get("capabilities") or "[]")
     return a
+
+
+class MessageRequest(BaseModel):
+    message: str
+    session_id: Optional[str] = None
+
+
+@router.post("/agents/{agent_id}/message")
+async def message_agent(agent_id: str, req: MessageRequest, request: Request) -> dict:
+    """Proxy a message to an agent via the gateway."""
+    name = agent_id.upper()
+    if not any(a["name"] == name for a in CORE_AGENTS):
+        raise HTTPException(404, f"Agent '{name}' not found")
+    gw = _gw(request)
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as c:
+            r = await c.post(
+                f"{gw}/v1/chat",
+                json={"agent": name, "message": req.message, "session_id": req.session_id},
+            )
+            r.raise_for_status()
+            return r.json()
+    except httpx.HTTPError as e:
+        raise HTTPException(502, f"Gateway error: {e}")
 
 
 @router.post("/agents/{agent_id}/wake")
@@ -139,10 +163,15 @@ async def sleep_agent(agent_id: str) -> dict:
 class TaskCreate(BaseModel):
     title:       str = Field(..., min_length=1, max_length=300)
     description: str = ""
-    priority:    str = "medium"
+    priority:    int | str = "medium"
     assigned_to: Optional[str] = None
     tags:        list[str] = []
     skills:      list[str] = []
+
+    @property
+    def priority_str(self) -> str:
+        """Always return priority as a string for storage."""
+        return str(self.priority)
 
 
 @router.get("/tasks")
@@ -187,7 +216,7 @@ async def create_task(task: TaskCreate) -> dict:
            VALUES (?, ?, ?, ?, ?, 'available', ?, ?, ?, ?)""",
         [task_id, task.title, task.description,
          task.assigned_to.lower() if task.assigned_to else None,
-         task.priority,
+         task.priority_str,
          json.dumps(task.tags), json.dumps(task.skills),
          ps_sha, now]
     )
