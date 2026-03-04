@@ -1,19 +1,24 @@
-FROM node:20-alpine AS deps
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --only=production
+FROM python:3.12-slim
 
-FROM node:20-alpine AS builder  
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PORT=8000
+
 WORKDIR /app
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
 COPY . .
-COPY --from=deps /app/node_modules ./node_modules
-RUN npm run build 2>/dev/null || echo "no build step"
 
-FROM node:20-alpine
-WORKDIR /app
-ENV NODE_ENV=production PORT=3000
-COPY --from=builder /app ./
-EXPOSE 3000
-HEALTHCHECK --interval=30s --timeout=5s \
-  CMD wget -qO- http://localhost:3000/health || exit 1
-CMD ["node", "dist/index.js"]
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD curl -f http://localhost:${PORT}/health || exit 1
+
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

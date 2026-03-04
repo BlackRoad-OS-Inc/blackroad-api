@@ -1,0 +1,41 @@
+name = "blackroad-task-dispatcher"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Workers KV for task state
+# Create a KV namespace: `npx wrangler kv:namespace create "TASK_STATE"`
+# Then replace the placeholder IDs below with the output from the above command.
+# For preview: `npx wrangler kv:namespace create "TASK_STATE" --preview`
+[[kv_namespaces]]
+binding = "TASK_STATE"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_YOUR_PREVIEW_KV_NAMESPACE_ID"
+
+# Queue for async task processing
+[[queues.producers]]
+binding = "TASK_QUEUE"
+queue = "blackroad-tasks"
+
+[[queues.consumers]]
+queue = "blackroad-tasks"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 3
+dead_letter_queue = "blackroad-tasks-dlq"
+
+[vars]
+ENVIRONMENT = "production"
+BLACKROAD_API_URL = "https://blackroad-api.railway.app"
+
+[env.staging]
+name = "blackroad-task-dispatcher-staging"
+[env.staging.vars]
+ENVIRONMENT = "staging"
+BLACKROAD_API_URL = "https://blackroad-api-staging.railway.app"
+
+[env.production]
+name = "blackroad-task-dispatcher"
+[env.production.vars]
+ENVIRONMENT = "production"
+BLACKROAD_API_URL = "https://blackroad-api.railway.app"

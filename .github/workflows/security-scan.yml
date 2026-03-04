@@ -15,13 +15,14 @@ permissions:
 jobs:
   secret-scan:
     name: Secret Detection
-    runs-on: [self-hosted, blackroad-fleet]
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
 
       - name: Scan for secrets (trufflehog)
-        uses: trufflesecurity/trufflehog@main
+        uses: trufflesecurity/trufflehog@c3e599b7163e8198a55467f3133db0e7b2a492cb # v3.93.7
         with:
           path: ./
           base: ${{ github.event.repository.default_branch }}
@@ -48,9 +49,9 @@ jobs:
 
   dependency-audit:
     name: Dependency Audit
-    runs-on: [self-hosted, blackroad-fleet]
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Node.js audit
         if: ${{ hashFiles('package-lock.json') != '' || hashFiles('package.json') != '' }}
@@ -67,17 +68,20 @@ jobs:
 
   codeql:
     name: CodeQL Analysis
-    runs-on: [self-hosted, blackroad-fleet]
+    runs-on: ubuntu-latest
     strategy:
       matrix:
-        language: ['javascript', 'python']
+        language: ['python']
+    permissions:
+      contents: read
+      security-events: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: github/codeql-action/init@c793b717bc78562f491db7b0e93a3a178b099162 # v4.32.5
         with:
           languages: ${{ matrix.language }}
         continue-on-error: true
-      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/autobuild@c793b717bc78562f491db7b0e93a3a178b099162 # v4.32.5
         continue-on-error: true
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@c793b717bc78562f491db7b0e93a3a178b099162 # v4.32.5
         continue-on-error: true
