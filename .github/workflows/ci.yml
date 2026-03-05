@@ -9,9 +9,11 @@ on:
 jobs:
   lint-test:
     name: Lint & Test
-    runs-on: [self-hosted, blackroad-fleet]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Detect project type
         id: detect
@@ -23,10 +25,25 @@ jobs:
           else echo "type=generic" >> $GITHUB_OUTPUT
           fi
 
-      # Node.js
-      - uses: actions/setup-node@v4
+      # Python
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        if: steps.detect.outputs.type == 'python'
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+      - name: Install Python dependencies
+        if: steps.detect.outputs.type == 'python'
+        run: pip install -r requirements.txt pytest pytest-asyncio httpx --quiet
+      - name: Run Python tests
+        if: steps.detect.outputs.type == 'python'
+        run: python -m pytest tests/ --tb=short -q
+
+      # Node.js / Cloudflare Worker
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         if: steps.detect.outputs.type == 'node' || steps.detect.outputs.type == 'worker'
-        with: { node-version: '20', cache: 'npm' }
+        with:
+          node-version: '20'
+          cache: 'npm'
       - run: npm ci
         if: steps.detect.outputs.type == 'node' || steps.detect.outputs.type == 'worker'
         continue-on-error: true
@@ -37,21 +54,11 @@ jobs:
         if: steps.detect.outputs.type == 'node' || steps.detect.outputs.type == 'worker'
         continue-on-error: true
 
-      # Python
-      - uses: actions/setup-python@v5
-        if: steps.detect.outputs.type == 'python'
-        with: { python-version: '3.12' }
-      - run: pip install -r requirements.txt --quiet
-        if: steps.detect.outputs.type == 'python'
-        continue-on-error: true
-      - run: python -m pytest --tb=short -q 2>/dev/null || echo "No tests found"
-        if: steps.detect.outputs.type == 'python'
-        continue-on-error: true
-
       # Go
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@4b73464bb391d4059bd26b0524d20df3927bd417 # v6.3.0
         if: steps.detect.outputs.type == 'go'
-        with: { go-version: '1.22' }
+        with:
+          go-version: '1.22'
       - run: go build ./... && go test ./...
         if: steps.detect.outputs.type == 'go'
         continue-on-error: true
@@ -59,14 +66,38 @@ jobs:
       - name: ✅ CI complete
         run: echo "CI passed for ${{ github.repository }}"
 
+  cf-worker-lint:
+    name: CF Worker Lint
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    if: hashFiles('workers/task-dispatcher/package.json') != ''
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: workers/task-dispatcher/package-lock.json
+      - name: Install worker deps
+        working-directory: workers/task-dispatcher
+        run: npm ci
+      - name: Typecheck worker
+        working-directory: workers/task-dispatcher
+        run: npx tsc --noEmit
+        continue-on-error: true
+
   typecheck:
     name: Type Check
-    runs-on: [self-hosted, blackroad-fleet]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
     if: contains(github.repository, 'blackroad')
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: '20' }
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '20'
       - run: npm ci 2>/dev/null || true
       - run: npx tsc --noEmit 2>/dev/null || echo "No TypeScript config"
         continue-on-error: true

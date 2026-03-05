@@ -14,3 +14,8 @@ poetry.lock
 *.db
 *.db-shm
 *.db-wal
+
+# Node / Cloudflare Worker
+node_modules/
+workers/task-dispatcher/node_modules/
+.wrangler/
