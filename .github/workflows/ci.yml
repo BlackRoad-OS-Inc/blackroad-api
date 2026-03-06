@@ -98,6 +98,12 @@ jobs:
       - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: '20'
-      - run: npm ci 2>/dev/null || true
-      - run: npx tsc --noEmit 2>/dev/null || echo "No TypeScript config"
+          cache: 'npm'
+          cache-dependency-path: workers/task-dispatcher/package-lock.json
+      - name: Install worker deps
+        working-directory: workers/task-dispatcher
+        run: npm ci
+      - name: Typecheck worker
+        working-directory: workers/task-dispatcher
+        run: npx tsc --noEmit
         continue-on-error: true
