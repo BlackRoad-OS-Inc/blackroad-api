@@ -1,129 +1,41 @@
+<div align="center">
+
+<img src="https://images.blackroad.io/pixel-art/road-logo.png" alt="BlackRoad OS" width="80" />
+
 # blackroad-api
 
-> ✅ **VERIFIED WORKING** — All 22 tests pass. CI runs on `ubuntu-latest`. All actions pinned to SHA-256 hashes. Cloudflare Worker deployed for long-running tasks. Automerge enabled for Dependabot & Copilot PRs.
+**REST API server for BlackRoad OS — OpenAPI spec, route handlers, and middleware.**
 
-REST API server for BlackRoad OS — agents, tasks, memory, and chat.
+[![BlackRoad OS](https://img.shields.io/badge/BlackRoad_OS-Pave_Tomorrow-FF2255?style=for-the-badge&labelColor=000000)](https://blackroad.io)
+[![License](https://img.shields.io/badge/License-Proprietary-FF6B2B?style=for-the-badge&labelColor=000000)](./LICENSE)
+[![Edge AI](https://img.shields.io/badge/Edge_AI-52_TOPS-00D4FF?style=for-the-badge&labelColor=000000)](https://github.com/BlackRoad-OS-Inc)
 
-[![CI](https://github.com/BlackRoad-OS-Inc/blackroad-api/actions/workflows/ci.yml/badge.svg)](https://github.com/BlackRoad-OS-Inc/blackroad-api/actions/workflows/ci.yml)
-[![Deploy](https://github.com/BlackRoad-OS-Inc/blackroad-api/actions/workflows/deploy.yml/badge.svg)](https://github.com/BlackRoad-OS-Inc/blackroad-api/actions/workflows/deploy.yml)
-[![Security Scan](https://github.com/BlackRoad-OS-Inc/blackroad-api/actions/workflows/security-scan.yml/badge.svg)](https://github.com/BlackRoad-OS-Inc/blackroad-api/actions/workflows/security-scan.yml)
+</div>
 
-## Verification Status
-
-| Check | Status |
-|-------|--------|
-| Unit + E2E tests (pytest) | ✅ 22/22 pass |
-| CI runner | ✅ `ubuntu-latest` (GitHub-hosted) |
-| Actions SHA-pinned | ✅ All actions use commit SHA hashes |
-| Automerge | ✅ Enabled for Dependabot & Copilot PRs |
-| Cloudflare Worker | ✅ `workers/task-dispatcher/` (async long tasks) |
-| Root Dockerfile | ✅ Python 3.12 FastAPI |
-| Dependabot | ✅ Weekly updates for pip, npm, GitHub Actions |
-
-## Overview
-
-The primary REST API for BlackRoad OS. All client applications (web, CLI, mobile) communicate through this API.
-
-**Core agents:** LUCIDIA · ALICE · OCTAVIA · PRISM · ECHO · CIPHER
-
-## Structure
-
-```
-blackroad-api/
-├── app/
-│   ├── api/v1/         # FastAPI route handlers
-│   ├── core/           # Settings, logging
-│   ├── workers/        # Celery tasks
-│   └── main.py         # App factory
-├── workers/
-│   └── task-dispatcher/ # Cloudflare Worker (long-running tasks)
-├── tests/              # pytest test suite (22 tests)
-├── infra/              # Railway / Docker infra
-├── openapi.yaml        # OpenAPI 3.1 spec
-└── .env.example
-```
-
-## Quick Start
-
-```bash
-# Python API
-pip install -r requirements.txt
-uvicorn app.main:app --reload   # dev server at http://localhost:8000
-pytest tests/ -v                # run 22 tests
-
-# Cloudflare Worker (long-running tasks)
-cd workers/task-dispatcher
-npm install
-npm run dev                     # local worker at http://localhost:8787
-```
-
-## API Endpoints
-
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/health` | Health check |
-| `GET` | `/v1/agents` | List all 6 agents |
-| `GET` | `/v1/agents/{id}` | Get agent details |
-| `POST` | `/v1/agents/{id}/message` | Send message to agent |
-| `GET` | `/v1/tasks` | List tasks |
-| `POST` | `/v1/tasks` | Create task |
-| `PATCH` | `/v1/tasks/{id}/claim` | Claim task |
-| `PATCH` | `/v1/tasks/{id}/complete` | Complete task |
-| `GET` | `/v1/memory` | List memory entries |
-| `POST` | `/v1/memory` | Write memory entry |
-| `POST` | `/v1/chat` | Chat with agent (gateway proxy) |
-
-Swagger UI: `/docs` — ReDoc: `/redoc`
-
-## Cloudflare Worker — Long-Running Tasks
-
-The `workers/task-dispatcher` Cloudflare Worker handles tasks that exceed normal API timeout limits:
-
-```bash
-# Enqueue a long task
-POST https://blackroad-task-dispatcher.workers.dev/dispatch
-{
-  "type": "agent_message",
-  "agent": "lucidia",
-  "input": { "message": "Analyze the Pi fleet health" }
-}
-
-# Poll for result
-GET https://blackroad-task-dispatcher.workers.dev/status/{taskId}
-```
-
-**Task types:** `agent_message` · `create_task` · `memory_write` · `health_check`
-
-## CI/CD
-
-| Workflow | Trigger | Runner |
-|----------|---------|--------|
-| `ci.yml` | push/PR | `ubuntu-latest` |
-| `deploy.yml` | push to main | `ubuntu-latest` |
-| `security-scan.yml` | push/PR/weekly | `ubuntu-latest` |
-| `automerge.yml` | PR opened | `ubuntu-latest` |
-| `bot-pr-review.yml` | PR opened | `ubuntu-latest` |
-| `notion-sync.yml` | push/weekly | `ubuntu-latest` |
-| `gdrive-backup.yml` | daily | `ubuntu-latest` |
-| `hf-sync.yml` | push/weekly | `ubuntu-latest` |
-
-All actions are pinned to SHA-256 commit hashes for supply-chain security.
-
-## Deployment
-
-- **Python API** → [Railway](https://railway.app) (`railway.toml`)
-- **Cloudflare Worker** → Cloudflare Workers (`workers/task-dispatcher/wrangler.toml`)
-
-Required secrets: `RAILWAY_TOKEN`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`
-
-## Authentication
-
-Bearer token authentication. All endpoints require `Authorization: Bearer <token>`.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md)
+<div align="center">
+<sub>Part of the <a href="https://blackroad.io">BlackRoad OS</a> ecosystem — sovereign edge AI infrastructure</sub>
+</div>
 
 ---
 
-© BlackRoad OS, Inc. — Your AI. Your Hardware. Your Rules. 🚀
+## Overview
+
+REST API server for BlackRoad OS — OpenAPI spec, route handlers, and middleware.
+
+## License
+
+**Proprietary** — Copyright © 2024–2026 [BlackRoad OS, Inc.](https://blackroad.io) All rights reserved.
+
+Founder & CEO: **Alexa Louise Amundson** · Delaware C-Corp
+
+See [LICENSE](./LICENSE) for full terms.
+
+---
+
+<div align="center">
+
+**BlackRoad OS — Pave Tomorrow.**
+
+[blackroad.io](https://blackroad.io) · [GitHub](https://github.com/BlackRoad-OS-Inc) · [Brand](https://brand.blackroad.io)
+
+</div>
