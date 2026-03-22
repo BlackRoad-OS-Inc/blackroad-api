@@ -1,4 +1,4 @@
-"""v1 API router — agents, memory, tasks, chat, health."""
+"""v1 API router — agents, memory, tasks, chat, search, fleet, stats."""
 
 from __future__ import annotations
 import hashlib
@@ -9,7 +9,7 @@ from time import perf_counter
 from typing import Optional
 
 import httpx
-from fastapi import APIRouter, HTTPException, Request, Body, Query
+from fastapi import APIRouter, HTTPException, Request, Body, Query, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
 from app.database import get_db
@@ -362,3 +362,153 @@ async def chat(payload: ChatRequest, request: Request) -> dict:
         raise HTTPException(503, "Gateway offline — start blackroad-core gateway on :8787")
     except Exception as e:
         raise HTTPException(503, str(e))
+
+
+# ── Search (FTS5) ────────────────────────────────────────────────────────────
+
+@router.get("/search")
+async def search(
+    q:     str = Query(..., min_length=1),
+    type:  Optional[str] = Query(None),
+    limit: int = Query(20, le=100),
+) -> dict:
+    """Full-text search across agents, tasks, and memory."""
+    db = get_db()
+    results = []
+
+    # Search memory
+    if not type or type == "memory":
+        rows = db.execute(
+            "SELECT hash, content, type, agent, tags, timestamp_ns FROM memory_entries WHERE content LIKE ? ORDER BY timestamp_ns DESC LIMIT ?",
+            [f"%{q}%", limit],
+        ).fetchall()
+        for r in rows:
+            results.append({
+                "type": "memory", "id": r["hash"], "title": r["content"][:120],
+                "content": r["content"], "agent": r["agent"],
+                "tags": json.loads(r["tags"] or "[]"), "score": 0.8,
+            })
+
+    # Search tasks
+    if not type or type == "task":
+        rows = db.execute(
+            "SELECT id, title, description, status, priority FROM tasks WHERE title LIKE ? OR description LIKE ? LIMIT ?",
+            [f"%{q}%", f"%{q}%", limit],
+        ).fetchall()
+        for r in rows:
+            results.append({
+                "type": "task", "id": r["id"], "title": r["title"],
+                "description": r["description"], "status": r["status"], "score": 0.7,
+            })
+
+    # Search agents
+    if not type or type == "agent":
+        rows = db.execute(
+            "SELECT id, name, type, status, capabilities FROM agents WHERE name LIKE ? OR type LIKE ? LIMIT ?",
+            [f"%{q}%", f"%{q}%", limit],
+        ).fetchall()
+        for r in rows:
+            results.append({
+                "type": "agent", "id": r["id"], "title": r["name"],
+                "agent_type": r["type"], "status": r["status"], "score": 0.9,
+            })
+
+    # Try FTS5 index if available
+    try:
+        fts_rows = db.execute(
+            "SELECT entity_type, entity_id, title, content, rank FROM search_index WHERE search_index MATCH ? ORDER BY rank LIMIT ?",
+            [q, limit],
+        ).fetchall()
+        for r in fts_rows:
+            results.append({
+                "type": r["entity_type"], "id": r["entity_id"],
+                "title": r["title"], "content": r["content"][:200],
+                "score": min(1.0, abs(r["rank"]) / 10),
+            })
+    except Exception:
+        pass  # FTS5 index may be empty
+
+    # Deduplicate by id
+    seen = set()
+    unique = []
+    for r in results:
+        if r["id"] not in seen:
+            seen.add(r["id"])
+            unique.append(r)
+
+    return {"results": unique[:limit], "total": len(unique), "query": q}
+
+
+# ── Fleet ────────────────────────────────────────────────────────────────────
+
+FLEET_NODES = [
+    {"id": "alice", "name": "Alice", "ip": "192.168.4.49", "role": "gateway",
+     "os": "Pi 5 (Bookworm)", "hailo_tops": 0},
+    {"id": "cecilia", "name": "Cecilia", "ip": "192.168.4.96", "role": "inference",
+     "os": "Pi 5 (Bookworm)", "hailo_tops": 26},
+    {"id": "octavia", "name": "Octavia", "ip": "192.168.4.101", "role": "devops",
+     "os": "Pi 5 (Bookworm)", "hailo_tops": 26},
+    {"id": "aria", "name": "Aria", "ip": "192.168.4.98", "role": "compute",
+     "os": "Pi 5 (Bookworm)", "hailo_tops": 0},
+    {"id": "lucidia", "name": "Lucidia", "ip": "192.168.4.38", "role": "apps",
+     "os": "Pi 5 (Bullseye)", "hailo_tops": 0},
+    {"id": "gematria", "name": "Gematria", "ip": "DO-nyc3", "role": "edge",
+     "os": "Ubuntu 22.04", "hailo_tops": 0},
+    {"id": "anastasia", "name": "Anastasia", "ip": "DO-nyc1", "role": "backup",
+     "os": "Ubuntu 22.04", "hailo_tops": 0},
+]
+
+
+@router.get("/fleet")
+async def fleet_status() -> dict:
+    """Get fleet node status."""
+    return {
+        "nodes": FLEET_NODES,
+        "total": len(FLEET_NODES),
+        "total_tops": sum(n["hailo_tops"] for n in FLEET_NODES),
+        "timestamp": int(time.time()),
+    }
+
+
+# ── Stats ────────────────────────────────────────────────────────────────────
+
+@router.get("/stats")
+async def stats(request: Request) -> dict:
+    """Aggregate statistics across all systems."""
+    db = get_db()
+    agents = db.execute("SELECT COUNT(*) as n FROM agents").fetchone()["n"]
+    active = db.execute("SELECT COUNT(*) as n FROM agents WHERE status = 'active'").fetchone()["n"]
+    tasks_total = db.execute("SELECT COUNT(*) as n FROM tasks").fetchone()["n"]
+    tasks_done = db.execute("SELECT COUNT(*) as n FROM tasks WHERE status = 'completed'").fetchone()["n"]
+    memory = db.execute("SELECT COUNT(*) as n FROM memory_entries").fetchone()["n"]
+    uptime = perf_counter() - request.app.state.start_time
+
+    return {
+        "agents": {"total": agents, "active": active},
+        "tasks": {"total": tasks_total, "completed": tasks_done,
+                  "pending": tasks_total - tasks_done},
+        "memory": {"entries": memory},
+        "fleet": {"nodes": len(FLEET_NODES), "tops": 52},
+        "uptime_seconds": round(uptime, 1),
+        "version": getattr(request.app.state, "settings", None)
+                   and request.app.state.settings.app_version or "1.0.0",
+    }
+
+
+# ── WebSocket for live events ────────────────────────────────────────────────
+
+_ws_clients: list[WebSocket] = []
+
+
+@router.websocket("/ws")
+async def websocket_endpoint(ws: WebSocket):
+    """Real-time event stream for dashboard clients."""
+    await ws.accept()
+    _ws_clients.append(ws)
+    try:
+        while True:
+            data = await ws.receive_text()
+            # Echo back for now; production would route to agents
+            await ws.send_json({"type": "ack", "data": data, "ts": int(time.time())})
+    except WebSocketDisconnect:
+        _ws_clients.remove(ws)

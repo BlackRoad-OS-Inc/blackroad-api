@@ -68,6 +68,39 @@ def init_db(path: str = "./blackroad.db") -> None:
         tags        TEXT DEFAULT '[]',
         timestamp_ns INTEGER NOT NULL
     );
+
+    -- FTS5 search index across all content
+    CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
+        entity_type,
+        entity_id,
+        title,
+        content,
+        tags,
+        tokenize='porter unicode61'
+    );
+
+    -- Fleet nodes table
+    CREATE TABLE IF NOT EXISTS fleet_nodes (
+        id          TEXT PRIMARY KEY,
+        name        TEXT NOT NULL,
+        ip          TEXT,
+        role        TEXT,
+        status      TEXT DEFAULT 'unknown',
+        os          TEXT,
+        hailo_tops  INTEGER DEFAULT 0,
+        last_seen   INTEGER,
+        metadata    TEXT DEFAULT '{}'
+    );
+
+    -- Sessions for collaboration
+    CREATE TABLE IF NOT EXISTS sessions (
+        id          TEXT PRIMARY KEY,
+        agent       TEXT NOT NULL,
+        started_at  INTEGER NOT NULL,
+        ended_at    INTEGER,
+        summary     TEXT,
+        handoff_to  TEXT
+    );
     """)
 
     # Seed the 6 core agents
